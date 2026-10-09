@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rosario y Coronillas Interactivas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .title-font {
+            font-family: 'Playfair Display', serif;
+        }
+
+        .bead-interactive {
+            transition: all 0.4s ease;
+            cursor: pointer;
+            transform-box: fill-box;
+            transform-origin: center;
+        }
+
+        .bead-interactive:hover {
+            transform: scale(1.2);
+            filter: brightness(1.2);
+        }
+
+        @keyframes pulse-glow {
+            0% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(252, 211, 77, 0.6)); }
+            50% { transform: scale(1.35); filter: drop-shadow(0 0 12px rgba(252, 211, 77, 1)); }
+            100% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(252, 211, 77, 0.6)); }
+        }
+
+        .animate-active {
+            animation: pulse-glow 2s infinite;
+            z-index: 10;
+        }
+
+        /* Ocultar barra de scroll para un aspecto más limpio en móviles */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1); 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2); 
+            border-radius: 4px;
+        }
+
+        /* Transición suave para el texto */
+        .fade-transition {
+            transition: opacity 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="antialiased text-slate-200">
+
+    <div class="flex-1 flex flex-col max-w-lg w-full mx-auto h-screen p-4 overflow-hidden shadow-2xl bg-slate-900/40 backdrop-blur-sm">
+        
+        <!-- Header & Selección -->
+        <header class="text-center py-2 shrink-0">
+            <h1 class="text-2xl font-semibold title-font text-amber-400 mb-2 tracking-wide">Oración Virtual</h1>
+            
+            <select id="rosary-mode" onchange="changeMode()" class="bg-slate-800 border border-slate-600 text-white text-sm rounded-xl focus:ring-amber-500 focus:border-amber-500 block w-full p-2.5 outline-none shadow-md transition-colors hover:bg-slate-700">
+                <option value="virgen">Santo Rosario (Virgen María)</option>
+                <option value="misericordia">Coronilla de la Divina Misericordia</option>
+                <option value="liberacion">Rosario de la Liberación</option>
+                <option value="libre">Modo Libre (Solo Conteo)</option>
+            </select>
+            
+            <p class="text-xs text-slate-400 font-light mt-2" id="progress-text">Inicia tocando la cruz</p>
+        </header>
+
+        <!-- Current Prayer Display -->
+        <div class="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-4 text-center shrink-0 shadow-lg mb-2 h-32 flex flex-col justify-center">
+            <h2 id="prayer-title" class="text-lg font-medium title-font text-amber-300 fade-transition">
+                Señal de la Cruz
+            </h2>
+            <div class="overflow-y-auto mt-2 h-full pr-1">
+                <p id="prayer-text" class="text-sm text-slate-300 leading-relaxed fade-transition italic font-light">
+                    Por la señal de la Santa Cruz...
+                </p>
+            </div>
+        </div>
+
+        <!-- SVG Container for the Rosary -->
+        <div class="flex-1 relative w-full flex items-center justify-center overflow-hidden bg-slate-950/30 rounded-3xl border border-slate-800/50 shadow-inner my-2">
+            <svg id="rosary-svg" viewBox="70 20 360 740" class="w-full h-full max-h-[55vh] drop-shadow-xl" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <filter id="glow-active">
+                        <feGaussianBlur stdDeviation="3" result="blur" />
+                        <feMerge>
+                            <feMergeNode in="blur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                    <filter id="glow-completed">
+                        <feGaussianBlur stdDeviation="1.5" result="blur" />
+                        <feMerge>
+                            <feMergeNode in="blur"/>
+                            <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                    </filter>
+                </defs>
+                <!-- El Rosario se generará dinámicamente aquí -->
+            </svg>
+        </div>
+
+        <!-- Controls -->
+        <div class="py-2 shrink-0 flex gap-3 justify-center items-center">
+            <button onclick="prevStep()" class="p-3 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors active:scale-95 shadow-md border border-slate-700">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <button onclick="nextStep()" class="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 text-white font-semibold text-lg hover:from-amber-500 hover:to-amber-400 transition-all active:scale-[0.98] shadow-lg shadow-amber-900/20">
+                Siguiente
+            </button>
+            <button onclick="resetRosary()" class="p-3 rounded-xl bg-slate-800 text-slate-300 hover:bg-rose-900/50 hover:text-rose-400 transition-colors active:scale-95 shadow-md border border-slate-700" title="Reiniciar">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let currentStep = 0;
+        const TOTAL_STEPS = 61; // 0 al 61 (61 es el estado final)
+        const beads = [];
+        let currentMode = 'virgen';
+
+        const COLOR_PENDING = '#475569';
+        const COLOR_ACTIVE = '#ffffff';
+        const COLOR_COMPLETED = '#eab308';
+        const COLOR_STRING = '#334155';
+
+        const CX = 250; 
+        const LOOP_CY = 260;
+        const LOOP_RX = 150;
+        const LOOP_RY = 190;
+        const CENTER_CY = 450; 
+        
+        // Textos comunes
+        const TXT_CREDO = "Creo en Dios, Padre todopoderoso, Creador del cielo y de la tierra. Creo en Jesucristo, su único Hijo, nuestro Señor...";
+        const TXT_PADRENUESTRO = "Padre nuestro, que estás en el cielo, santificado sea tu Nombre; venga a nosotros tu reino; hágase tu voluntad en la tierra como en el cielo. Danos hoy nuestro pan de cada día; perdona nuestras ofensas...";
+        const TXT_AVEMARIA = "Dios te salve, María, llena eres de gracia; el Señor es contigo. Bendita Tú eres entre todas las mujeres, y bendito es el fruto de tu vientre, Jesús. Santa María, Madre de Dios, ruega por nosotros, pecadores...";
+        const TXT_GLORIA = "Gloria al Padre, y al Hijo, y al Espíritu Santo. Como era en el principio, ahora y siempre, por los siglos de los siglos. Amén.";
+        const TXT_SALVE = "Dios te salve, Reina y Madre de misericordia, vida, dulzura y esperanza nuestra; Dios te salve...";
+
+        // Inicializar las coordenadas y tipos de cuentas (Solo se hace 1 vez)
+        function initRosaryData() {
+            beads.push({ id: 0, cx: 250, cy: 720, type: 'cross' }); // Cruz
+            beads.push({ id: 1, cx: 250, cy: 650, type: 'large' }); // Intro 1
+            beads.push({ id: 2, cx: 250, cy: 610, type: 'small' }); // Intro 2
+            beads.push({ id: 3, cx: 250, cy: 580, type: 'small' }); // Intro 3
+            beads.push({ id: 4, cx: 250, cy: 550, type: 'small' }); // Intro 4
+            beads.push({ id: 5, cx: 250, cy: 510, type: 'large' }); // Intro 5
+            beads.push({ id: 6, cx: 250, cy: CENTER_CY, type: 'center' }); // Medalla
+
+            const loopSlots = [
+                ...Array(10).fill('small'), 'gap', 'large', 'gap',
+                ...Array(10).fill('small'), 'gap', 'large', 'gap',
+                ...Array(10).fill('small'), 'gap', 'large', 'gap',
+                ...Array(10).fill('small'), 'gap', 'large', 'gap',
+                ...Array(10).fill('small')
+            ];
+
+            let currentId = 7;
+            const startAngle = Math.PI / 2 + 0.18; 
+            const endAngle = Math.PI * 2.5 - 0.18; 
+            const totalAngle = endAngle - startAngle;
+            const totalSlots = loopSlots.length - 1; 
+
+            loopSlots.forEach((type, slot) => {
+                if (type !== 'gap') {
+                    const t = slot / totalSlots;
+                    const angle = startAngle + t * totalAngle;
+                    const cx = CX + LOOP_RX * Math.cos(angle);
+                    const cy = LOOP_CY + LOOP_RY * Math.sin(angle);
+                    beads.push({ id: currentId++, cx, cy, type });
+                }
+            });
+        }
+
+        function renderRosary() {
+            const svg = document.getElementById('rosary-svg');
+            let innerHTML = '';
+
+            let pathD = `M ${beads[0].cx},${beads[0].cy} `;
+            for(let i = 1; i <= 6; i++) {
+                pathD += `L ${beads[i].cx},${beads[i].cy} `;
+            }
+            for(let i = 7; i <= 60; i++) {
+                pathD += `L ${beads[i].cx},${beads[i].cy} `;
+            }
+            pathD += `L ${beads[6].cx},${beads[6].cy}`; 
+
+            innerHTML += `<path d="${pathD}" stroke="${COLOR_STRING}" stroke-width="2" fill="none" stroke-linejoin="round" />`;
+
+            beads.forEach(b => {
+                let elem = '';
+                if (b.type === 'cross') {
+                    elem = `
+                    <g id="bead-group-${b.id}" class="bead-interactive" onclick="setStep(${b.id})">
+                        <path id="bead-${b.id}" d="M 246,680 L 254,680 L 254,705 L 272,705 L 272,713 L 254,713 L 254,745 L 246,745 L 246,713 L 228,713 L 228,705 L 246,705 Z" fill="${COLOR_PENDING}" rx="2" stroke="#1e293b" stroke-width="1"/>
+                    </g>`;
+                } else if (b.type === 'center') {
+                    elem = `
+                    <g id="bead-group-${b.id}" class="bead-interactive" onclick="setStep(${b.id})">
+                        <circle id="bead-${b.id}" cx="${b.cx}" cy="${b.cy}" r="16" fill="${COLOR_PENDING}" stroke="#1e293b" stroke-width="1"/>
+                        <circle cx="${b.cx}" cy="${b.cy}" r="12" fill="transparent" stroke="rgba(255,255,255,0.2)" stroke-width="1"/>
+                        <text x="${b.cx}" y="${b.cy + 5}" font-size="14" font-family="serif" font-style="italic" text-anchor="middle" fill="#0f172a" font-weight="bold" pointer-events="none">M</text>
+                    </g>`;
+                } else {
+                    const r = b.type === 'large' ? 8 : 5;
+                    elem = `
+                    <g id="bead-group-${b.id}" class="bead-interactive" onclick="setStep(${b.id})">
+                        <circle id="bead-${b.id}" cx="${b.cx}" cy="${b.cy}" r="${r}" fill="${COLOR_PENDING}" stroke="#1e293b" stroke-width="0.5"/>
+                    </g>`;
+                }
+                innerHTML += elem;
+            });
+
+            svg.innerHTML = svg.innerHTML.split('<!-- El Rosario se generará dinámicamente aquí -->')[0] + innerHTML;
+        }
+
+        function getPrayerDetails(mode, step) {
+            const b = step <= 60 ? beads[step] : null;
+            const misterio = step >= 6 ? Math.floor((step - 6) / 11) + 1 : 0;
+
+            if (mode === 'libre') {
+                if (step === 61) return { title: "Fin del Recorrido", desc: "Has completado la vuelta al rosario." };
+                if (step === 0) return { title: "Inicio (Cruz)", desc: "Puedes usar el contador libremente." };
+                if (step === 6) return { title: "Medalla Central", desc: "Puedes usar el contador libremente." };
+                return { title: `Cuenta ${step + 1} de 61`, desc: "Meditación y oración libre." };
+            }
+
+            if (mode === 'virgen') {
+                if (step === 0) return { title: "Señal de la Cruz", desc: "Por la señal de la Santa Cruz, de nuestros enemigos líbranos Señor, Dios nuestro. En el nombre del Padre, del Hijo y del Espíritu Santo. Amén." };
+                if (step === 1) return { title: "Acto de Contrición / Padrenuestro", desc: TXT_PADRENUESTRO };
+                if (step >= 2 && step <= 4) return { title: "Avemaría", desc: TXT_AVEMARIA };
+                if (step === 5) return { title: "Gloria", desc: TXT_GLORIA };
+                if (step === 6) return { title: "1º Misterio", desc: "Se enuncia el misterio. " + TXT_PADRENUESTRO };
+                if (step === 61) return { title: "La Salve", desc: TXT_SALVE };
+                
+                if (b.type === 'large') return { title: `${misterio + 1}º Misterio`, desc: "Se enuncia el misterio correspondiente. \n\n" + TXT_PADRENUESTRO };
+                if (b.type === 'small') return { title: "Avemaría", desc: TXT_AVEMARIA };
+            }
+
+            if (mode === 'misericordia') {
+                if (step === 0) return { title: "Señal de la Cruz", desc: "En el nombre del Padre, del Hijo y del Espíritu Santo. Amén." };
+                if (step === 1) return { title: "Padrenuestro", desc: TXT_PADRENUESTRO };
+                if (step === 2) return { title: "Avemaría", desc: TXT_AVEMARIA };
+                if (step === 3) return { title: "El Credo", desc: TXT_CREDO };
+                if (step === 4 || step === 5) return { title: "Silencio / Preparación", desc: "(Puedes meditar en silencio o avanzar a la medalla central)" };
+                if (step === 61) return { title: "Oración Final", desc: "Santo Dios, Santo Fuerte, Santo Inmortal, ten piedad de nosotros y del mundo entero. (Repetir 3 veces)" };
+
+                if (b.type === 'large' || step === 6) return { title: "Padre Eterno", desc: "Padre Eterno, te ofrezco el Cuerpo y la Sangre, el Alma y la Divinidad de Tu Amadísimo Hijo, nuestro Señor Jesucristo, como propiciación de nuestros pecados y los del mundo entero." };
+                if (b.type === 'small') return { title: "Invocación", desc: "Por Su dolorosa Pasión, ten misericordia de nosotros y del mundo entero." };
+            }
+
+            if (mode === 'liberacion') {
+                if (step === 0) return { title: "Señal de la Cruz", desc: "En el nombre del Padre, del Hijo y del Espíritu Santo. Amén." };
+                if (step >= 1 && step <= 5) return { title: "El Credo", desc: TXT_CREDO };
+                if (step === 61) return { title: "Oración Final / Salve", desc: TXT_SALVE };
+
+                if (b.type === 'large' || step === 6) return { title: "Proclamación", desc: "Si Jesús me libera, seré verdaderamente libre." };
+                if (b.type === 'small') return { title: "Súplica", desc: "Jesús, ten piedad de mí. \nJesús, sáname. \nJesús, sálvame. \nJesús, libérame." };
+            }
+            
+            return { title: "", desc: "" };
+        }
+
+        function updateVisuals() {
+            for(let i = 0; i <= 60; i++) {
+                const el = document.getElementById(`bead-${i}`);
+                if (!el) continue;
+
+                const isCompleted = i < currentStep;
+                const isActive = (i === currentStep) || (currentStep === 61 && i === 6);
+
+                if (isActive) {
+                    el.setAttribute('fill', COLOR_ACTIVE);
+                    el.setAttribute('filter', 'url(#glow-active)');
+                    el.classList.add('animate-active');
+                } else if (isCompleted) {
+                    el.setAttribute('fill', COLOR_COMPLETED);
+                    el.setAttribute('filter', 'url(#glow-completed)');
+                    el.classList.remove('animate-active');
+                } else {
+                    el.setAttribute('fill', COLOR_PENDING);
+                    el.removeAttribute('filter');
+                    el.classList.remove('animate-active');
+                }
+            }
+
+            // Actualizar textos con transición
+            const titleEl = document.getElementById('prayer-title');
+            const textEl = document.getElementById('prayer-text');
+            const progressEl = document.getElementById('progress-text');
+            
+            titleEl.style.opacity = 0;
+            textEl.style.opacity = 0;
+            
+            setTimeout(() => {
+                const prayer = getPrayerDetails(currentMode, currentStep);
+                titleEl.innerText = prayer.title;
+                // Mantener saltos de línea
+                textEl.innerHTML = prayer.desc.replace(/\n/g, '<br>');
+                
+                if (currentMode === 'libre') {
+                    progressEl.innerText = currentStep === 61 ? "Finalizado" : `Cuenta actual: ${currentStep + 1} de 61`;
+                } else {
+                    progressEl.innerText = currentStep === 61 ? "Has concluido la oración" : `Cuenta ${currentStep + 1} de 61`;
+                }
+
+                titleEl.style.opacity = 1;
+                textEl.style.opacity = 1;
+            }, 200);
+        }
+
+        function changeMode() {
+            const select = document.getElementById('rosary-mode');
+            currentMode = select.value;
+            resetRosary();
+        }
+
+        function setStep(stepIndex) {
+            if (stepIndex >= 0 && stepIndex <= TOTAL_STEPS) {
+                currentStep = stepIndex;
+                updateVisuals();
+            }
+        }
+
+        function nextStep() {
+            if (currentStep < TOTAL_STEPS) {
+                currentStep++;
+                updateVisuals();
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 0) {
+                currentStep--;
+                updateVisuals();
+            }
+        }
+
+        function resetRosary() {
+            currentStep = 0;
+            updateVisuals();
+        }
+
+        window.onload = () => {
+            initRosaryData();
+            renderRosary();
+            updateVisuals();
+        };
+    </script>
+</body>
+</html>
